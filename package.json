@@ -1,0 +1,9 @@
+{
+  "name": "kadr-reels-practicum",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/preview.mjs",
+    "test": "node --test tests/*.cjs"
+  }
+}
