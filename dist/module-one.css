@@ -1,0 +1,24 @@
+/* Chapter 1 · mission 3 accordion and account decision */
+.settings-intro .settings-meter{height:8px;margin-top:18px;border-radius:99px;background:#ece5f6;overflow:hidden}
+.settings-intro .settings-meter i{display:block;height:100%;border-radius:inherit;background:var(--green);transition:width .3s ease}
+.settings-intro .settings-progress{margin:8px 0 0;font-size:13px;font-weight:700;color:#5f4f78}
+.settings-steps{display:grid;gap:12px;margin:18px 0 28px}
+.lesson details.settings-step,details.settings-step{margin:0;border:1px solid #e3dced;border-bottom:4px solid #e6def0;border-radius:20px;background:#fff;overflow:hidden}
+details.settings-step>summary{display:flex;align-items:center;justify-content:flex-start;gap:14px;margin:0;padding:14px 16px;border:0;border-radius:0;background:#fff;font-size:inherit;font-weight:inherit;color:var(--ink);cursor:pointer;list-style:none}
+details.settings-step>summary::-webkit-details-marker{display:none}
+details.settings-step[open]>summary{background:#f6f1fd;border-bottom:1px solid #ece7f2}
+details.settings-step>summary .guide-step{flex:0 0 40px;height:40px;border-radius:12px}
+.settings-step-title{display:grid;gap:3px;min-width:0;flex:1}
+.settings-step-title b{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.step-state{font-size:12px;font-weight:600;color:#8b769b}
+.step-state.is-done{color:#2f8a6c}
+.step-state.is-done::before{content:"✓ ";font-weight:800}
+details.settings-step>.screen-guide{margin:0;border:0;border-radius:0;box-shadow:none}
+details.settings-step>.screen-guide>.screen-guide-heading{display:none}
+details.settings-step>.screen-guide+.screen-guide{border-top:1px solid #ece7f2}
+.account-decision{border-top:1px solid #ece7f2}
+.account-decision h4{margin:6px 0 8px}
+.decision-list{margin:10px 0 14px;padding-left:18px;color:#74657f}
+.decision-list li{margin-bottom:8px;line-height:1.5}
+@media (max-width:420px){details.settings-step>summary{gap:10px;padding:12px}details.settings-step>summary .guide-step{flex-basis:34px;height:34px;font-size:13px}.settings-step-title b{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.settings-intro .settings-meter i{transition:none}}
