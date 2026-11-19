@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const S=require('../dist/state.js');
-const code=fs.readFileSync(require('node:path').join(__dirname,'../dist/visual-guide.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/app.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/course.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/help.js'),'utf8');
+const code=fs.readFileSync(require('node:path').join(__dirname,'../dist/visual-guide.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/app.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/course.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/workshop.js'),'utf8')+'\n'+fs.readFileSync(require('node:path').join(__dirname,'../dist/help.js'),'utf8');
 function app(initial={},hash='#home'){
  const elements=new Map(),values=new Map([['reels-start-v1',typeof initial==='string'?initial:JSON.stringify(initial)]]);
  const el=k=>{if(!elements.has(k))elements.set(k,{innerHTML:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){},toggle(){}},querySelector(){return null},focus(){},scrollIntoView(){},showModal(){},insertAdjacentHTML(){},close(){},setAttribute(){},removeAttribute(){},disabled:false,isConnected:true});return elements.get(k)};
@@ -49,3 +49,59 @@ test('chapter 3 caption check passes the course example with a real nick and fla
 test('chapter 3 hook and caption are optional and reach the backpack',()=>{const a=app({fields:{check_13:true,check_15:true,m3Hook:'Мой хук',m3Caption:'Моё описание'}});assert.equal(a.run('valid(13)'),true);assert.equal(a.run('valid(15)'),true);const t=a.run('materialText()');assert.ok(t.includes('Хук: Мой хук'));assert.ok(t.includes('Моё описание'))});
 test('chapter 3 dialog mockups render, are labelled as schemes and never show the nick template',()=>{const a=app();for(const f of ['m3HookChat','m3CaptionChat','m3FixChat','m3TelegramChat']){const h=a.run(f+'()');assert.ok(h.includes('data-m3-chat'));assert.match(h,/не скриншот/);assert.ok(!h.includes('@твой_ник'))}for(const i of [13,14,15,17])assert.ok(a.run(`moduleThreeTools(${i})`).includes('data-m3-chat'));assert.equal(a.run('m3HookVariants.length'),5);assert.equal(a.run('m3HookVariants.some(v=>/[—–]/.test(v))'),false)});
 test('m2Cards calls always pass index, title and text',()=>{const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../dist/course.js'),'utf8');const a=app();for(const i of [6,7,8,9,10,11,12,13,14,15,16,17])assert.ok(!a.run(`lessonTools(${i})`).includes('undefined'),'mission '+i)});
+test('every workshop mission renders its route, example and actual student deliverable',()=>{
+  const a=app();
+  for(let i=18;i<42;i++){
+    a.run(`render(${i},'none')`);
+    const html=a.run('app.innerHTML');
+    assert.ok(html.includes('Как я это делаю') && html.includes('Разобрать на примере') && html.includes('Твоя практика'));
+    assert.ok(html.includes('data-field="check_'+i+'"'));
+    assert.equal((html.match(/class="work-steps"/g)||[]).length>=1,true);
+  }
+});
+test('structured deliverables validate, flow into later missions and into the plain-text export',()=>{
+  const a=app();
+  a.run(`for(let i=1;i<=5;i++){state.fields['bankFile'+i]='Файл '+i;state.fields['bankTopic'+i]='Тема '+i}
+    state.fields.check_18=true;state.fields.check_27=true;state.fields.check_28=true;state.fields.check_34=true;state.fields.check_36=true;`);
+  assert.equal(a.run('valid(18)'),true);
+  assert.equal(a.run('valid(27)'),false);
+  a.run("exportChecks.forEach((_,i)=>state.fields['exportCheck'+i]=true)");
+  assert.equal(a.run('valid(27)'),true);
+  a.run("Object.assign(state.fields,{publishedUrl:'https://www.instagram.com/reel/Example_01/',publishedMode:'Обычный',publishedDate:'2026-11-19',publishedTime:'18:30'})");
+  assert.equal(a.run('valid(28)'),true);
+  assert.equal(a.run("workshopPractice(36).includes('data-use-release')"),true);
+  a.run("state.fields.publishedUrl='https://www.instagram.com/'");assert.equal(a.run('valid(28)'),false);
+  assert.equal(a.run('valid(34)'),false);
+  a.run("Object.assign(state.fields,{cal_1_start:'2026-11-19',cal_1_d1_done:true,cal_1_d1_main:'0',cal_1_d1_trial:'0'})");
+  assert.equal(a.run('valid(34)'),true);
+  a.run(`sampleStats.forEach((r,i)=>Object.entries({...r,link:'https://www.instagram.com/reel/Example_'+i+'/'}).forEach(([k,v])=>state.fields[metricKey(i+1,k)]=v))`);
+  assert.equal(a.run('valid(36)'),true);
+  assert.match(a.run('workshopTools(37)'),/1,20%/);
+  let text=a.run('materialText()');
+  for(const value of ['Файл 5','Тема 5','18:30','Сохранения от охвата: 1,20%','обычных 0'])assert.ok(text.includes(value));
+  a.run("state.fields.insight_2_reach='0';state.fields.insight_2_views='0';state.fields.insight_2_saves=''");
+  assert.equal(a.run('valid(36)'),true);
+  assert.equal(a.run("percent('',0)"),'—');
+  a.run("state.fields.insight_1_views=''");assert.equal(a.run('invalidField(36)[0]'),'insight_1_views');
+  a.run("state.fields.insight_1_views='0';state.fields.insight_3_hours='24'");
+  assert.match(a.run('workshopTools(37)'),/Возраст или режим различаются/);
+});
+test('legacy cycle IDs and independent new cycles remain selectable; student notes render as text',()=>{
+  const a=app({fields:{cal_1_start:'2026-10-20',cal_0000000100_foo:'ignored',cal_00000000aa_foo:'ignored',
+    'cal_00000000ab-aabbccddeeff00112233445566778899_start':'2026-11-19',answer_28:'<название>'}});
+  assert.equal(a.run('cycles().length'),2);
+  assert.equal(a.run("cycles()[0]"),'1');
+  assert.match(a.run('carried([["Ролик",28]])'), /&lt;название&gt;/);
+});
+test('complete all 42 missions, reload and repeat the final mission without extra XP',async()=>{
+  const a=app();
+  a.run(`state.fields={handle:'@author',accountKind:'Личный аккаунт',access:true,status:'Есть предупреждение',accountsCenterReview:'Один Instagram, проверено',archive:'Оставляю как есть',name:'Автор',format:'С лицом',topics:'Книги',bio:'Книжный блог',avatar:true,profileUpdated:true,startDate:'2026-11-19',followers:'0',trial:'Нет',finalCheck:true};
+    shots.forEach(([k])=>state.fields['setting_'+k]='Проверено');chapterTwoChecks.forEach(([k])=>state.fields[k]=true);
+    for(let i=6;i<42;i++){state.fields['answer_'+i]='Мой сохранённый результат';state.fields['check_'+i]=true;}`);
+  for(let i=0;i<42;i++){a.run(`render(${i},'none')`);await a.run('completeMission()');}
+  const saved=JSON.parse(a.values.get('reels-start-v1')), b=app(saved,'#mission/42');
+  await b.run('completeMission()');
+  assert.equal(b.run('state.done.length*50'),2100);
+  assert.equal(b.run('Object.keys(state.completedOn).length'),42);
+  assert.equal(b.run('chapterDone(6)'),6);
+});

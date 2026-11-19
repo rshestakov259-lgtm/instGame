@@ -37,3 +37,11 @@
 - Node regression suite: 23/23 passed. Syntax check passed.
 - Browser: mission 3 renders; image lightbox opens new permissions image; checked selection persists after reload. Mobile iframe 390px (375px content) has no horizontal overflow. New images load without broken sources.
 - No hidden settings inferred from navigation-only menu rows. Existing followers image retained.
+
+## Главы 4–7 и облачные сохранения, 19 ноября 2026
+
+Добавлены 24 пошаговые практики, два оригинальных вертикальных MP4, проверка экспорта, карточка публикации и таблица трёх измерений. Учебная выборка статистики открывается отдельно от сохранённых учеником результатов.
+
+Проверки Node охватывают маршрут из 42 миссий, повтор последней миссии, предыдущие версии ответов, нулевые и отсутствующие метрики. Обработчик API проверен с SQLite в сценариях двух независимых браузерных хранилищ, разных пользователей, параллельной записи, переноса гостевого прогресса, восстановления JSON и возвращения после потери связи.
+
+В браузере проверены воспроизведение отрезка и оба видео 540 × 960. Исходник длится 12 секунд, готовый пример 6 секунд.
