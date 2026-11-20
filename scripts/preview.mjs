@@ -11,7 +11,7 @@ const cache = fileURLToPath(new URL('../.preview-data/', import.meta.url));
 await mkdir(cache, { recursive: true });
 const db = openLocalDB(path.join(cache, 'course.sqlite'));
 const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
-  '.svg':'image/svg+xml','.jpg':'image/jpeg','.png':'image/png','.mp4':'video/mp4','.zip':'application/zip','.txt':'text/plain; charset=utf-8'};
+  '.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png','.mp4':'video/mp4','.zip':'application/zip','.txt':'text/plain; charset=utf-8'};
 const assets = { async fetch(request) {
   const pathname = decodeURIComponent(new URL(request.url).pathname);
   const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
