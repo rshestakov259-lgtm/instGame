@@ -105,3 +105,33 @@ test('complete all 42 missions, reload and repeat the final mission without extr
   assert.equal(b.run('Object.keys(state.completedOn).length'),42);
   assert.equal(b.run('chapterDone(6)'),6);
 });
+
+test('chapter covers resume the current unfinished mission and advance after a completed chapter',()=>{
+  const a=app({last:22,done:[18,19]});
+  a.run('render("chapter/4","none")');
+  const page=()=>a.ctx.document.querySelector('#app').innerHTML;
+  assert.match(page(),/class="studio-primary" data-lesson="22"/);
+  assert.match(page(),/Продолжить миссию/);
+  assert.equal((page().match(/class="track-card"/g)||[]).length,6);
+  a.run('state.done=chapterIds(3);render("chapter/4","none")');
+  assert.match(page(),/class="studio-primary" data-view="chapter\/5"/);
+  a.run('state.done=Array.from({length:42},(_,i)=>i);render("chapter/4","none")');
+  assert.match(page(),/class="studio-primary" data-view="calendar"/);
+});
+
+test('both route displays identify the selected mission, and completed states have a text label',()=>{
+  const a=app({last:10,done:[6]});
+  for(const compact of [false,true]){
+    const html=a.run('missionMap(1,10,'+compact+')');
+    assert.match(html,/is-finished[\s\S]*?data-lesson="6"[\s\S]*?Пройдена/);
+    assert.match(html,/is-next-up[\s\S]*?data-lesson="10"[\s\S]*?Следующая/);
+    assert.equal(html.includes('track-detail'),!compact);
+    assert.equal((html.match(/data-lesson=/g)||[]).length,6);
+  }
+  for(let i=0;i<42;i++){
+    a.run('render('+i+',"none")');
+    const page=a.ctx.document.querySelector('#app').innerHTML;
+    assert.equal((page.match(/aria-current="step"/g)||[]).length,1);
+    assert.equal((page.match(/id="lesson-practice"/g)||[]).length,i<6?0:1);
+  }
+});
