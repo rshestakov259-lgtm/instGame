@@ -1,0 +1,12 @@
+[mcp_servers.shadcn]
+command = "npx"
+args = ["--yes", "shadcn@4.23.0", "mcp"]
+startup_timeout_sec = 45
+env_vars = ["HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "NODE_EXTRA_CA_CERTS"]
+
+[mcp_servers.shadcn.env]
+NODE_USE_SYSTEM_CA = "1"
+
+[mcp_servers."21st"]
+url = "https://21st.dev/api/mcp"
+env_http_headers = { "x-api-key" = "API_KEY_21ST" }

@@ -124,74 +124,120 @@ const chapterStickers=['camera','idea','editor','film','clapper','calendar','gro
 const chapterIds=c=>Array.from({length:6},(_,j)=>c*6+j);
 const chapterDone=c=>chapterIds(c).filter(i=>state.done.includes(i)).length;
 const courseNext=()=>missions.findIndex((_,i)=>!state.done.includes(i));
-const studioPalettes = [
-  ['#ddd1fa','#b7a1ee'], ['#c5e1e3','#8dbbbd'], ['#f4d0dc','#dba3bc'],
-  ['#c9e6d3','#92bda6'], ['#f7d8bd','#e4ab83'], ['#cedafb','#a0b2e3'], ['#ded4f0','#bcabd9']
+const stickerNames = ['Камера', 'Искра', 'Перо редактора', 'Катушка', 'Хлопушка', 'Календарь', 'Звезда роста'];
+const stationNames = [
+  ['Аккаунт','Диагностика','Настройки','Архив','Профиль','Точка отсчёта'],
+  ['Лента','Референс','Конкуренты','Скриншот','Видео','Комплект'],
+  ['Два чата','Хук','Редактор','Описание','Пример','Telegram'],
+  ['Галерея','Съёмка','Без лица','Видеобанк','Фрагменты','Подборка'],
+  ['Черновик','Хук','Звук','Экспорт','Публикация','Проверка'],
+  ['Режим','Темп','План дня','Пробные Reels','Календарь','Возвращение'],
+  ['Данные','Темы','Просмотры','Эксперимент','Новый месяц','Система']
 ];
+const worldColors = ['#d3b9ff','#99ded8','#f4bdcc','#9fe3b5','#ffd094','#b5caff','#d4b8ff'];
+const stagePoints = [
+  [[11,65],[25,34],[42,62],[58,39],[74,68],[88,39]],
+  [[11,49],[28,68],[41,34],[59,60],[74,32],[89,60]],
+  [[11,61],[25,35],[41,68],[58,45],[74,64],[89,35]]
+];
+const narrowPoints = [[23,16],[72,28],[29,43],[73,56],[24,70],[69,83]];
+const sceneFile = (c, small = false) => c === 0 ? (small ? 'assets/stage-portrait.webp' : 'assets/stage-wide.webp') : `assets/worlds/stage-${c+1}-${small?'mobile':'wide'}.webp`;
+const pin = c => `assets/pins/${chapterStickers[c]}.webp`;
+const equippedChapter = () => chapterStickers.findIndex((key,c) => state.fields.profilePin === key && chapterDone(c) === 6);
 
-function chaptersPanel(c, picker = false) {
-  return `<div class="studio-curriculum">${chapters.map((ch,k) => {
-    const n = chapterDone(k), selected = k === c;
-    return `<button type="button" ${picker ? 'data-chapter="'+k+'"' : 'data-view="chapter/'+(k+1)+'"'} class="chapter-entry ${selected ? 'selected' : ''}" ${selected ? 'aria-current="true"' : ''}>
-      <span class="chapter-seq">${n === 6 ? icon('check') : String(k+1).padStart(2,'0')}</span><span>${ch.title}</span><small aria-label="Пройдено ${n} из 6">${n}/6</small></button>`;
+function equipPin(c) {
+  if (!Number.isInteger(c) || c < 0 || c >= chapters.length || chapterDone(c) !== 6) return false;
+  if (state.fields.profilePin === chapterStickers[c]) return true;
+  state.fields.profilePin = chapterStickers[c];
+  return persist();
+}
+
+function chaptersPanel(c) {
+  return `<div class="world-picker">${chapters.map((ch,k)=>{
+    const n=chapterDone(k), selected=k===c;
+    return `<button type="button" data-chapter="${k}" class="world-choice ${selected?'selected':''}" ${selected?'aria-current="true"':''} style="--world:${worldColors[k]}">
+      <span class="world-window"><img class="world-thumb" src="${sceneFile(k)}" alt="" width="220" height="96"><span class="world-count" aria-label="Пройдено ${n} из 6">${n===6?icon('check'):`${n}/6`}</span></span>
+      <span class="world-title"><small>Глава 0${k+1}</small><strong>${ch.title}</strong></span></button>`;
   }).join('')}</div>`;
 }
 
 function showChapters() {
   const c = String(current).startsWith('chapter/') ? Number(current.split('/')[1])-1 : Math.floor(state.last/6);
-  document.querySelector('#rewardContent').innerHTML = `<button id="closeReward" class="modal-close" aria-label="Закрыть">${icon('close')}</button><h2>Выбрать главу</h2>${chaptersPanel(c,true)}`;
+  document.querySelector('#rewardContent').innerHTML = `<button id="closeReward" class="modal-close" aria-label="Закрыть">${icon('close')}</button><h2>Главы практикума</h2>${chaptersPanel(c)}`;
   openDialog('reward');
 }
 
+function routeWire(points, ids, narrow) {
+  const parts = points.slice(1).map(([x,y],j) => {
+    const [px,py] = points[j];
+    const cx = (px+x)*5, cy = (py+y)*2.5;
+    const d = narrow ? `M ${px*10} ${py*5} C ${px*10} ${cy} ${x*10} ${cy} ${x*10} ${y*5}` :
+      `M ${px*10} ${py*5} C ${cx} ${py*5} ${cx} ${y*5} ${x*10} ${y*5}`;
+    const finished = state.done.includes(ids[j]) && state.done.includes(ids[j+1]);
+    return `<g class="${finished?'wire-done':''}"><path class="wire-shadow" d="${d}"/><path class="wire-core" d="${d}"/></g>`;
+  });
+  return `<svg class="stage-wire ${narrow?'narrow-wire':'wide-wire'}" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">${parts.join('')}</svg>`;
+}
+
 function missionMap(c, active, compact) {
-  return `<ol class="mission-track ${compact ? 'compact-track' : ''}" aria-label="Миссии главы">${chapterIds(c).map((id,j) => {
-    const done = state.done.includes(id), nextUp = !done && id === active;
-    const label = done ? 'Пройдена' : nextUp ? 'Следующая' : 'Доступна';
-    return `<li class="${done ? 'is-finished' : nextUp ? 'is-next-up' : 'is-available'}">
-      <button type="button" class="track-card" data-lesson="${id}">
-        <span class="track-point" aria-hidden="true">${done ? icon('check') : String(j+1).padStart(2,'0')}</span>
-        <span class="track-text"><span class="track-state">${label}</span><strong>${missions[id][0]}</strong>${compact ? '' : `<span class="track-detail">${missions[id][1]}</span>`}</span>
-        <span class="track-xp">${done ? icon('check') : icon('bolt')} ${done ? '50 XP' : '+50 XP'}</span>
-      </button></li>`;
-  }).join('')}</ol>`;
+  const ids = chapterIds(c), wide = stagePoints[c % stagePoints.length];
+  const narrow = narrowPoints.map(([x,y])=>[c%2 ? 100-x : x,y]);
+  const items = ids.map((id,j) => {
+    const done = state.done.includes(id), next = id===active && !done;
+    const status = done ? 'Пройдена' : next ? 'Следующая' : 'Доступна';
+    const cls = done ? 'is-finished' : next ? 'is-next-up' : 'is-available';
+    const number = String(j+1).padStart(2,'0');
+    if (compact) return `<li class="${cls}"><button type="button" class="track-card" data-lesson="${id}"><span class="track-point">${done?icon('check'):number}</span><span class="track-text"><span class="track-state">${status}</span><strong>${missions[id][0]}</strong></span><span class="track-xp">${done?'50 XP':'+50 XP'}</span>${icon('chevron')}</button></li>`;
+    return `<li class="station ${cls}" style="--x:${wide[j][0]}%;--y:${wide[j][1]}%;--mx:${narrow[j][0]}%;--my:${narrow[j][1]}%">
+      <button type="button" class="stage-key" data-lesson="${id}" aria-label="Миссия ${j+1}. ${missions[id][0]}. ${status}"${next?' aria-current="step"':''}>
+        <span class="key-face" aria-hidden="true">${done?icon('check'):number}</span><span class="key-caption" aria-hidden="true">${stationNames[c][j]}</span></button></li>`;
+  }).join('');
+  if (compact) return `<ol class="mission-track compact-track" aria-label="Миссии главы">${items}</ol>`;
+  return `<div class="game-stage scene-${c}"><picture class="stage-art"><source media="(max-width: 600px)" srcset="${sceneFile(c,true)}"><img src="${sceneFile(c)}" alt="" fetchpriority="high" width="1200" height="640"></picture>
+    <div class="stage-shade"></div>${routeWire(wide,ids,false)}${routeWire(narrow,ids,true)}
+    <ol class="stage-stations" aria-label="Миссии главы">${items}</ol></div>`;
 }
 
-function chapterCoverArt(c) {
-  if (c === 0 || c === 3) return '<img class="camera-product" src="assets/studio-camcorder.webp" alt="" width="832" height="580" fetchpriority="high">';
-  if (c === 4) return `<div class="edit-sheet"><img src="assets/practice/book-cover-poster.jpg" alt=""><img src="assets/practice/book-cover-edit-poster.jpg" alt=""></div><img class="cover-clap" src="assets/stickers/clapper.svg" alt="">`;
-  return `<div class="object-sheet"><div class="proof-card rear-card"><img src="assets/stickers/${chapterStickers[(c+6)%7]}.svg" alt=""></div><div class="proof-card front-card"><img src="assets/stickers/${chapterStickers[c]}.svg" alt=""></div></div>`;
+function setRouteMode(mode) {
+  if (!['list','map'].includes(mode) || state.mapMode === mode) return;
+  const lane = document.querySelector('#mission-lane');
+  if (!lane) return;
+  state.mapMode = mode;
+  persist();
+  const active = lane.dataset.active === '' ? undefined : Number(lane.dataset.active);
+  lane.innerHTML = missionMap(Number(lane.dataset.chapter),active,mode==='list');
+  document.querySelectorAll('#mode-control [data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
 }
 
+window.KadrMountControls = () => {
+  const host = document.querySelector('#mode-control');
+  if (host && window.KadrControls) window.KadrControls.mount(host,state.mapMode,setRouteMode,document.querySelector('#chapter-meter'));
+};
 
 function courseHome(c) {
   const meta = chapters[c], ids = chapterIds(c), complete = chapterDone(c);
   const last = state.last;
-  const active = ids.includes(last) && !state.done.includes(last) ? last : ids.find(i => !state.done.includes(i));
-  let action;
-  if (active !== undefined) {
-    const label = complete || (last === active && (last !== 0 || state.fields.handle)) ? 'Продолжить миссию' : 'Начать миссию';
-    action = `<button type="button" class="studio-primary" data-lesson="${active}">${icon('play')}${label}</button>`;
-  } else {
-    const remaining = chapters.map((_,j)=>(c+j+1)%chapters.length).find(k=>chapterDone(k)<6);
-    action = remaining === undefined ? `<button class="studio-primary" data-view="calendar">${icon('calendar')}Открыть календарь</button>` :
-      `<button class="studio-primary" data-view="chapter/${remaining+1}">${icon('book')}${remaining > c ? 'К следующей главе' : 'К непройденной главе'}</button>`;
-  }
+  const active = ids.includes(last) && !state.done.includes(last) ? last : ids.find(i=>!state.done.includes(i));
   const compact = state.mapMode === 'list', achieved = Math.min(todayCount(),state.goal);
-  const [paper, ink] = studioPalettes[c];
+  const remaining = chapters.map((_,j)=>(c+j+1)%chapters.length).find(k=>chapterDone(k)<6);
+  const action = active !== undefined ? `<button type="button" class="studio-primary" data-lesson="${active}">${icon('play')}${complete || (active===last && (last!==0 || state.fields.handle)) ? 'Продолжить миссию':'Начать миссию'}</button>` : remaining === undefined ? `<button class="studio-primary" data-view="calendar">${icon('calendar')}Открыть календарь</button>` : `<button class="studio-primary" data-view="chapter/${remaining+1}">${icon('chevron')}${remaining>c?'К следующей главе':'К непройденной главе'}</button>`;
   document.querySelector('#crumb').textContent = current === 'home' ? 'Путь обучения' : meta.title;
-  app.innerHTML = `<div class="path-page">
-    <section class="chapter-cover" style="--cover:${paper};--cover-line:${ink}">
-      <div class="cover-copy"><div class="cover-meta"><span>Глава 0${c+1} / 07</span><i></i>${meta.world.toLocaleLowerCase('ru')}</div>
-        <h1>${meta.title}</h1><p>${meta.desc}</p><div class="cover-actions">${action}<button id="chapters" class="cover-secondary">${icon('grid')}Все главы</button></div></div>
-      <div class="cover-visual" aria-hidden="true"><div class="cover-orbit"></div><div class="viewfinder"><i></i><i></i><i></i><i></i></div>${chapterCoverArt(c)}</div>
-    </section>
-    <div class="path-columns"><section class="mission-section"><div class="path-heading"><div><h2>Маршрут главы</h2><p>Пройдено ${complete} из 6 миссий</p></div>
-      <div class="track-switch" role="group" aria-label="Вид маршрута"><button data-mode="map" aria-label="Карта" title="Карта" aria-pressed="${!compact}">${icon('map')}</button><button data-mode="list" aria-label="Список" title="Список" aria-pressed="${compact}">${icon('list')}</button></div></div>
-      ${missionMap(c,active,compact)}</section>
-      <aside class="path-aside"><section class="syllabus"><h2>Главы курса</h2>${chaptersPanel(c)}</section>
-      <section class="daily-panel"><div class="daily-title"><span class="daily-mark">${icon('flag')}</span><h2>Цель на сегодня</h2></div><p>${achieved === state.goal ? 'Цель выполнена' : 'Пройдено сегодня'} <b>${achieved} / ${state.goal}</b></p><progress value="${achieved}" max="${state.goal}" aria-label="Миссий сегодня"></progress><button class="quiet" data-view="profile">Изменить цель</button></section>
-      <div class="click-guide"><img src="assets/click.svg" alt="" width="54" height="54"><div><b>Клик на связи</b><button class="quiet" data-view="help">Открыть помощь</button></div></div></aside>
-    </div></div>`;
+  app.innerHTML = `<div class="campaign" style="--world:${worldColors[c]}">
+    <header class="world-head"><div><div class="world-kicker"><span class="world-label">${icon('map')}${meta.world}</span><span>Глава 0${c+1} / 07</span></div>
+      <h1>${meta.title}</h1><p>${meta.desc}</p></div><button id="chapters" class="worlds-button" aria-haspopup="dialog">${icon('grid')}Все главы</button></header>
+    <div class="game-layout"><section class="game-console" aria-label="Маршрут главы"><div class="console-top"><h2>Маршрут главы</h2>
+      <div id="mode-control"><div class="game-switch fallback-switch" role="group" aria-label="Вид маршрута"><button data-mode="map" aria-pressed="${!compact}">${icon('map')}Карта</button><button data-mode="list" aria-pressed="${compact}">${icon('list')}Список</button></div></div></div>
+      <div id="mission-lane" data-chapter="${c}" data-active="${active??''}">${missionMap(c,active,compact)}</div>
+      <div class="console-foot"><span class="route-count"><span id="chapter-meter" data-count="${complete}"><span class="film-slots" aria-hidden="true">${ids.map(id=>`<i class="${state.done.includes(id)?'filled':''}"></i>`).join('')}</span></span>${complete} из 6 пройдено</span><span class="route-legend">${active===undefined?icon('check')+'Глава пройдена':'<i></i>Твой ход'}</span></div></section>
+    <aside class="game-desk"><section class="mission-ticket"><div class="ticket-meta">${icon(active===undefined?'check':'flag')} ${active===undefined?'Глава собрана':'Твоя миссия'}<span>${active===undefined?'06 / 06':String(active%6+1).padStart(2,'0')+' / 06'}</span></div>
+      <h2>${active===undefined?'Все шесть пройдены':missions[active][0]}</h2><p>${active===undefined?'Значок этой главы теперь в твоей коллекции.':missions[active][1]}</p>
+      <div class="ticket-bottom"><span class="gold-xp">${icon('bolt')} ${active===undefined?'300 XP':'+50 XP'}</span>${action}</div></section>
+      <section class="pin-card"><div><span class="small-label">${complete===6?'Получена награда':'Награда главы'}</span><h2>«${stickerNames[c]}»</h2><span class="pin-hint">${complete===6?'Значок в коллекции':'Значок за 6 миссий'}</span><button class="pin-link" data-view="achievements">${icon('award')} Коллекция</button></div><div class="pin-display"><img src="${pin(c)}" alt="" width="140" height="140"></div></section>
+    </aside></div>
+    <section class="studio-bottom"><div class="guide-note"><img src="assets/click.svg" alt="" width="54" height="54"><div><h2>Клик на связи</h2><p>Подскажу, если возник вопрос по заданию.</p></div><button class="helper-link" data-view="help" aria-label="Открыть помощь Клика">${icon('book')}</button></div>
+      <div class="goal-note"><span class="goal-icon">${icon('flag')}</span><div><h2>Цель на сегодня</h2><p>${achieved} из ${state.goal} · ${achieved===state.goal?'выполнена':'в своём темпе'}</p></div><button class="helper-link" data-view="profile" aria-label="Изменить дневную цель">${icon('sliders')}</button></div></section>
+  </div>`;
+  window.KadrMountControls();
 }
 
 
@@ -204,8 +250,31 @@ function lessonTools(i) {
 }
 function refResult(f,v,age='До 10 дней'){if(age==='От 10 дней до полугода')return 'Ролик в промежуточном возрасте не подходит ни в одну группу. Возьми свежий до 10 дней или старше полугода.';if(age==='Старше полугода'){if(v==='')return 'Введи число просмотров.';v=Number(v);if(!Number.isSafeInteger(v)||v<0)return 'Нужно целое число просмотров, 0 или больше.';return `Порог: 2 000 000 просмотров. ${v>=2e6?'Подходит по просмотрам.':'Пока ниже моего порога.'}`}if(f===''||v==='')return 'Введи оба показателя.';f=Number(f);v=Number(v);if(!Number.isSafeInteger(f)||f<=0||!Number.isSafeInteger(v)||v<0)return 'Нужны целые числа: подписчиков больше 0, просмотров 0 или больше.';const threshold=Math.ceil(f*1.8);return `Порог: ${threshold.toLocaleString('ru')} просмотров. ${v>=threshold?'Подходит по соотношению.':'Пока ниже моего порога.'}`}
 function updateRef(){const e=document.querySelector('#refResult');if(e)e.textContent=refResult(state.fields.refFollowers??'',state.fields.refViews??'',state.fields.refAge||'До 10 дней')}
-function showReward(i,fresh){const c=Math.floor(i/6),complete=chapterDone(c)===6,nextId=chapterIds(c).find(id=>!state.done.includes(id));document.querySelector('#rewardContent').innerHTML=`<button id="closeReward" class="modal-close" aria-label="Закрыть награду"><svg class="icon ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button><div class="confetti" aria-hidden="true">${Array.from({length:16},(_,j)=>`<i style="--i:${j}"></i>`).join('')}</div><img src="assets/click.svg" class="reward-mascot" alt="Клик радуется"><span class="tiny">${fresh?'ОТЛИЧНАЯ РАБОТА':'ОТВЕТЫ ОБНОВЛЕНЫ'}</span><h2>${complete?'Глава пройдена':'Миссия пройдена'}</h2><p>${missions[i][0]} - выполнено.</p><div class="reward-points">${icon('bolt')} ${fresh?'+50 XP':'Прогресс сохранён'}</div>${complete?`<div class="new-badge">${icon('award')} ${chapters[c].title} · 6 из 6</div>`:''}<button class="primary" data-reward-go="${complete?(c<6?'chapter/'+(c+2):'calendar'):nextId}">${complete?(c<6?'Следующая глава':'К календарю'):'Следующая миссия'} ${icon('chevron')}</button><button class="quiet" data-reward-go="chapter/${c+1}">К маршруту главы</button>`;openDialog('reward');if(fresh)playReward()}
-function achievements(){app.innerHTML=`<section class="screen-heading"><h1>Мои награды</h1><p>Заверши шесть миссий главы, чтобы получить её стикер. Каждая новая миссия приносит 50 XP.</p></section><div class="achievement-summary"><span>${icon('bolt')} <b>${state.done.length*50}</b> XP</span><span>${icon('check')} <b>${state.done.length}/42</b> миссий</span></div><div class="badge-grid">${chapters.map((c,i)=>`<article class="badge-card ${chapterDone(i)===6?'unlocked':'locked'}"><div class="sticker-badge"><img src="assets/stickers/${chapterStickers[i]}.svg" alt=""></div><span class="badge-status">${chapterDone(i)===6?'ПОЛУЧЕНО':'ГЛАВА 0'+(i+1)}</span><h2>${c.title}</h2><p>${c.desc}</p><div class="badge-track"><i style="width:${chapterDone(i)/6*100}%"></i></div><small>${chapterDone(i)} / 6 миссий</small><button class="quiet" data-view="chapter/${i+1}">Открыть главу <svg class="icon ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></article>`).join('')}</div>`}
+function showReward(i, fresh) {
+  const c=Math.floor(i/6), complete=chapterDone(c)===6, next=chapterIds(c).find(id=>!state.done.includes(id));
+  const destination=complete ? (c<6?'chapter/'+(c+2):'calendar') : next;
+  document.querySelector('#rewardContent').innerHTML = `<button id="closeReward" class="modal-close" aria-label="Закрыть награду">${icon('close')}</button>
+    <div class="reward-ticket" style="--world:${worldColors[c]}"><div class="reward-object"><img src="${complete?pin(c):'assets/click.svg'}" alt="${complete?'Коллекционный значок '+stickerNames[c]:'Клик'}"></div>
+      <span class="small-label">${fresh?'Миссия пройдена':'Ответы сохранены'}</span><h2>${complete?'Глава собрана!':missions[i][0]}</h2>
+      <p>${complete?'Твой значок «'+stickerNames[c]+'» появился в коллекции.':'В главе «'+chapters[c].title+'» пройдено '+chapterDone(c)+' из 6 миссий.'}</p>
+      <span class="gold-xp">${icon('bolt')} ${fresh?'+50 XP':state.done.length*50+' XP всего'}</span>
+      <button class="primary" data-reward-go="${destination}">${complete?(c<6?'Следующая глава':'К календарю'):'Следующая миссия'} ${icon('chevron')}</button>
+      ${complete?'<button class="quiet" data-reward-go="achievements">Посмотреть значок</button>':''}<button class="quiet" data-reward-go="chapter/${c+1}">К маршруту главы</button></div>`;
+  openDialog('reward');
+  if (fresh) playReward();
+}
+
+function achievements() {
+  const count=chapters.filter((_,c)=>chapterDone(c)===6).length, equipped=equippedChapter();
+  app.innerHTML = `<section class="screen-heading album-head"><div class="world-kicker">${icon('award')}Коллекция студии</div><h1>Мои награды</h1><p>За каждую пройденную главу ты получаешь значок. Любой из собранных можно поставить в профиль.</p></section>
+    <div class="album-count" tabindex="-1"><strong>${count} из 7 значков</strong><span>${icon('bolt')} ${state.done.length*50} XP</span></div>
+    <div class="badge-grid game-album">${chapters.map((ch,c)=>{
+      const n=chapterDone(c), earned=n===6;
+      return `<article class="badge-card ${earned?'unlocked':'locked'}" style="--world:${worldColors[c]}"><div class="sticker-badge"><img src="${pin(c)}" alt="" width="145" height="145"><span>${equipped===c?'В профиле':earned?'Получен':n+' / 6'}</span></div>
+        <small>Глава 0${c+1} · ${ch.title}</small><h2>«${stickerNames[c]}»</h2>${earned?`<button class="pin-action" data-equip="${c}" aria-pressed="${equipped===c}" ${equipped===c?'disabled':''}>${icon(equipped===c?'check':'user')}${equipped===c?'В профиле':'Поставить в профиль'}</button>`:`<button class="pin-action" data-view="chapter/${c+1}">К миссиям ${icon('chevron')}</button>`}</article>`;
+    }).join('')}</div>`;
+}
+
 function materialText(){return baseMaterialText()+'\n\nМОЯ ПРАКТИКА\n'+lessons.map((l,j)=>'\n'+l[0]+'\n'+((j+6>=18?evidence(j+6):state.fields['answer_'+(j+6)])||'—')).join('\n')+'\n\nМОИ ТЕКСТЫ\nХук: '+(state.fields.m3Hook||'—')+'\n\nОписание:\n'+(state.fields.m3Caption||'—')+'\n\nПРОМПТ РЕДАКТОРА\n'+editorPrompt+'\n\nКАЛЕНДАРЬ\n'+Object.entries(state.fields).filter(([k])=>k.startsWith('cal_')).map(([k,v])=>k+': '+v).join('\n')}
 function workbookChapter(c, open) {
   const account = `<pre>${esc(baseMaterialText())}</pre><button class="secondary" data-lesson="0">Открыть миссию об аккаунте</button>`;
@@ -215,18 +284,18 @@ function workbookChapter(c, open) {
       optionalAnswer(i) && state.done.includes(i) ? 'Миссия пройдена. Материал хранится в галерее телефона.' : 'Ответ появится здесь после практики.';
     return `<details class="answer-entry"><summary>${missions[i][0]}</summary><div>${savedAnswer ? `<pre>${esc(savedAnswer)}</pre>` : `<p class="note">${empty}</p>`}<button class="quiet" data-lesson="${i}">Открыть миссию</button></div></details>`;
   }).join('');
-  return `<details class="workbook-chapter" ${open ? 'open' : ''}><summary><span class="chapter-seq">0${c+1}</span><b>${chapters[c].title}</b><small>${chapterDone(c)}/6</small></summary><div class="chapter-answers">${c === 0 ? account : answers()}</div></details>`;
+  return `<details class="workbook-chapter" ${open ? 'open' : ''}><summary><img class="workbook-pin" src="${pin(c)}" alt="" width="38" height="38"><b><span class="folder-index">Глава 0${c+1}</span>${chapters[c].title}</b><small aria-label="Пройдено ${chapterDone(c)} из 6">${chapterDone(c)}/6</small></summary><div class="chapter-answers">${c === 0 ? account : answers()}</div></details>`;
 }
 
 function materials() {
   const favorites = missions.map((_,i)=>i).filter(i=>state.fields['bookmark_'+i]);
   const active = courseNext();
-  const heading = `<section class="screen-heading"><h1>Мой рюкзак</h1><p>Ответы из миссий, закладки и инструменты для следующего ролика.</p></section>`;
+  const heading = screenIntro('bag','Мой рюкзак','Здесь собираются твои ответы, материалы для следующих роликов и закладки.','Пройдено миссий: '+state.done.length+' / 42',pin(2));
   const bookmarked = favorites.length ? favorites.map(i=>`<button class="saved-mission" data-lesson="${i}"><small>Глава ${Math.floor(i/6)+1} · Миссия ${i%6+1}</small><b>${missions[i][0]}</b></button>`).join('') :
     `<p>Сохрани миссию кнопкой «В закладки» в уроке. Здесь появится ссылка на неё.</p><button class="quiet" data-lesson="${active < 0 ? state.last : active}">Открыть миссию</button>`;
   app.innerHTML = heading + `<div class="backpack-layout"><section class="workbook"><div class="workbook-title"><h2>Мои ответы</h2><button class="primary" id="download">Скачать ответы</button></div>
     ${chapters.map((_,c)=>workbookChapter(c,c === Math.floor(state.last/6) && (Object.keys(state.fields).length > 0))).join('')}</section>
-    <aside class="bag-aside"><section class="bag-card"><h2>${icon('book')} Закладки</h2>${bookmarked}</section><section class="bag-card"><h2>Инструменты</h2><button class="tool-link" data-view="preflight">${icon('sliders')}Проверить ролик</button><button class="tool-link" data-view="calendar">${icon('calendar')}Календарь публикаций</button><button class="tool-link" data-view="help">${icon('book')}Центр помощи</button></section></aside>
+    <aside class="bag-aside"><section class="bag-card"><h2>${icon('book')} Закладки <small class="folder-count">${favorites.length}</small></h2>${bookmarked}</section><section class="bag-card"><h2>Инструменты</h2><button class="tool-link" data-view="preflight">${icon('sliders')}Проверить ролик</button><button class="tool-link" data-view="calendar">${icon('calendar')}Календарь публикаций</button><button class="tool-link" data-view="help">${icon('book')}Центр помощи</button></section></aside>
     <section class="bag-utilities"><details class="resource"><summary>Промпт редактора</summary><div><pre>${esc(editorPrompt)}</pre><button class="secondary" data-copy-editor>Скопировать промпт</button></div></details>
     <details class="resource"><summary>Стикеры Кадра</summary><div><div class="sticker-shelf">${['camera','idea','editor','film','clapper','calendar','growth','award'].map(n=>`<img src="assets/stickers/${n}.svg" alt="" width="68" height="68" loading="lazy">`).join('')}</div><div class="actions"><a class="secondary" href="kadr-stickers.zip" download>Скачать стикеры SVG</a><a class="quiet" href="stickers.html">Открыть коллекцию</a></div></div></details>
     <details class="resource"><summary>Резервная копия прогресса</summary><div><p>Файл JSON содержит ответы, закладки и календарь. Сохрани его, чтобы при необходимости восстановить прогресс.</p><div class="actions"><button class="secondary" id="backup">Скачать копию</button><label class="secondary import-label">Восстановить из файла<input id="restore" type="file" accept="application/json,.json"></label><button class="quiet" data-view="profile">Настройки сохранения</button></div></div></details></section></div>`;
@@ -242,13 +311,38 @@ function newCycleId(){
   return Date.now().toString(36).padStart(10,'0')+'-'+crypto.randomUUID().replaceAll('-','');
 }
 function calendarDate(start,offset){const d=new Date(start+'T12:00:00');d.setDate(d.getDate()+offset);return KadrState.dateKey(d)}
-function calendar(){const all=cycles(),id=all.includes(String(state.fields.cal_selected))?String(state.fields.cal_selected):all.at(-1);app.innerHTML=`<section class="screen-heading"><h1>Календарь публикаций</h1><p>План на 60 дней и твои отметки о вышедших Reels.</p></section><div class="actions">${all.length?'<button class="primary" id="newCycle">Создать цикл</button>':''}${all.length?'<button class="secondary" id="repeatCycle">Повторить вторые 30 дней</button>':''}<button class="secondary" data-lesson="34">Как работать с календарём</button></div>${all.length?`<div class="cycle-tabs">${all.map((n,index)=>`<button class="${n===id?'selected':''}" data-cycle="${n}" aria-pressed="${n===id}">Цикл ${index+1} · ${esc(state.fields['cal_'+n+'_start'])}</button>`).join('')}</div>`:'<section class="empty-calendar"><img src="assets/stickers/calendar.svg" alt="" width="128" height="128"><div><h2>Первый цикл публикаций</h2><p>Выбери дату старта и режим Reels. Откроется план на 60 дней, в котором можно отмечать публикации и записывать наблюдения.</p><button class="primary" id="newCycle">Создать первый цикл</button></div></section>'}<div id="calendarBody"></div>`;if(!id)return;state.fields.cal_selected=id;const key='cal_'+id+'_',repeat=!!state.fields[key+'repeat'],length=repeat?30:60,day=Math.min(length,Math.max(1,Number(state.fields[key+'day'])||1)),mode=['main','trial','both'].includes(state.fields[key+'mode'])?state.fields[key+'mode']:'main',plan=calendarPlan(day,mode,repeat),date=calendarDate(state.fields[key+'start'],day-1),dk=key+'d'+day+'_',completed=Array.from({length},(_,j)=>!!state.fields[key+'d'+(j+1)+'_done']).filter(Boolean).length;document.querySelector('#calendarBody').innerHTML=`<div class="calendar-layout"><section class="calendar-board"><div class="panel-heading"><h2>${repeat?'Повторение второго месяца':'60 дней практики'}</h2><span class="pill">${completed} / ${length}</span></div><p class="note">${{main:'Обычный режим',trial:'Пробный режим',both:'Обычный + пробный режим'}[mode]} · даты идут от начала цикла</p><div class="calendar-grid">${Array.from({length},(_,j)=>`<button data-day="${j+1}" aria-pressed="${j+1===day}" class="${j+1===day?'selected':''} ${state.fields[key+'d'+(j+1)+'_done']?'day-complete':''}" aria-label="День ${j+1}, ${calendarDate(state.fields[key+'start'],j)}${state.fields[key+'d'+(j+1)+'_done']?', отмечен':''}"><small>${calendarDate(state.fields[key+'start'],j).slice(5).split('-').reverse().join('.')}</small><b>${j+1}</b><span>${state.fields[key+'d'+(j+1)+'_done']?'<svg class="icon ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12l4 4L19 6"/></svg>':'·'}</span></button>`).join('')}</div></section><section class="settings-card day-editor"><span class="tiny">ДЕНЬ ${day} · ${date.split('-').reverse().join('.')}</span><h2>${day<=14&&!repeat?'Входим в ритм':'Продолжаем практику'}</h2><div class="day-target"><span><b>${plan.main}</b>обычных</span><span><b>${plan.trial}</b>пробных</span></div><p class="note">Мой план, не обязательный лимит платформы. Учитывай доступность режима и качество материалов.</p><p class="note">Если роликов этого типа не было, введи 0.</p>${field(dk+'main','Опубликовано обычных','0','number')}${field(dk+'trial','Опубликовано пробных','0','number')}${area(dk+'note','Заметка дня','Что вышло, какие темы проверяешь?')}<p class="note">Перевод пробного ролика в общий показ не включай в число новых. В смешанном режиме после разгона выбирай число пробных сам и чередуй его.</p><button class="primary" id="markDay" data-key="${dk}">${state.fields[dk+'done']?'Обновить отметку':'Отметить день'}</button>${state.fields[dk+'done']?`<button class="quiet" id="unmarkDay" data-key="${dk}">Снять отметку</button>`:''}</section></div>`}
+function calendar() {
+  const all=cycles();
+  const id=all.includes(String(state.fields.cal_selected)) ? String(state.fields.cal_selected) : all.at(-1);
+  const key='cal_'+id+'_', repeat=!!state.fields[key+'repeat'], length=repeat?30:60;
+  const day=Math.min(length,Math.max(1,Math.trunc(Number(state.fields[key+'day']))||1));
+  const start=state.fields[key+'start'];
+  const tools=`<div class="actions calendar-actions">${id?'<button class="primary" id="newCycle">Создать цикл</button><button class="secondary" id="repeatCycle">Повторить вторые 30 дней</button>':''}<button class="quiet" data-lesson="34">Как работать с календарём</button></div>`;
+  const tabs=all.length?`<nav class="cycle-tabs" aria-label="Циклы публикаций">${all.map((n,j)=>`<button class="${n===id?'selected':''}" data-cycle="${n}" aria-pressed="${n===id}">Цикл ${j+1} · ${esc(state.fields['cal_'+n+'_start'])}</button>`).join('')}</nav>`:'';
+  app.innerHTML=screenIntro('calendar','Календарь публикаций','Выбирай съёмочный день, отмечай вышедшие ролики и записывай наблюдения.',id?'Цикл '+(all.indexOf(id)+1)+' · '+length+' дней':'План на 60 дней',pin(5))+tools+tabs+'<div id="calendarBody"></div>';
+  const body=document.querySelector('#calendarBody');
+  if(!id){body.innerHTML=`<section class="empty-calendar start-cycle"><div><h2>Первый цикл публикаций</h2><p>Укажи дату старта и выбери обычные Reels, пробные или оба формата. Для каждого дня появится свой план.</p><button class="primary" id="newCycle">Создать первый цикл</button></div><div class="calendar-sample" aria-hidden="true">${Array.from({length:14},(_,j)=>`<i>${j+1}</i>`).join('')}</div></section>`;return;}
+  state.fields.cal_selected=id;
+  const mode=['main','trial','both'].includes(state.fields[key+'mode'])?state.fields[key+'mode']:'main';
+  const plan=calendarPlan(day,mode,repeat), date=calendarDate(start,day-1), dk=key+'d'+day+'_';
+  const completed=Array.from({length},(_,i)=>!!state.fields[key+'d'+(i+1)+'_done']).filter(Boolean).length;
+  const offset=(new Date(start+'T12:00:00').getDay()+6)%7;
+  const days=Array.from({length},(_,i)=>{
+    const iso=calendarDate(start,i),number=i+1,done=!!state.fields[key+'d'+number+'_done'];
+    const label='День '+number+', '+iso+(done?', отмечен':'');
+    return `<button data-day="${number}" aria-pressed="${number===day}" class="${number===day?'selected':''} ${done?'day-complete':''}" aria-label="${label}"><small>${iso.slice(5).split('-').reverse().join('.')}</small><b>${number}</b><span>${done?icon('check'):''}</span></button>`;
+  }).join('');
+  body.innerHTML=`<div class="calendar-layout"><section class="calendar-board"><div class="panel-heading"><h2>${repeat?'Повторение второго месяца':'60 дней практики'}</h2><span class="pill">${completed} / ${length}</span></div><p class="note">${{main:'Обычные Reels',trial:'Пробные Reels',both:'Обычные и пробные Reels'}[mode]}</p><div class="calendar-weekdays" aria-hidden="true">${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=>`<span>${d}</span>`).join('')}</div><div class="calendar-grid">${'<i class="day-spacer" aria-hidden="true"></i>'.repeat(offset)}${days}</div></section>
+    <section class="settings-card day-editor"><span class="small-label">День ${day} · ${date.split('-').reverse().join('.')}</span><h2>${day<=14&&!repeat?'Входим в ритм':'Продолжаем практику'}</h2><div class="day-target"><span><b>${plan.main}</b>обычных</span><span><b>${plan.trial}</b>пробных</span></div><p class="note">План Романа. Подстрой объём под доступные режимы и качество роликов.</p><div class="day-counts">${field(dk+'main','Опубликовано обычных','0','number')}${field(dk+'trial','Опубликовано пробных','0','number')}</div><p class="note">Если роликов этого типа не было, введи 0. Перевод пробного в общий показ не считается новой публикацией.</p>${area(dk+'note','Заметка дня','Какие темы ты проверяешь?')}<button class="primary" id="markDay" data-key="${dk}">${state.fields[dk+'done']?'Обновить отметку':'Отметить день'}</button>${state.fields[dk+'done']?`<button class="quiet" id="unmarkDay" data-key="${dk}">Снять отметку</button>`:''}</section></div>`;
+}
+
 function newCycle(repeat){const last=state.fields.cal_selected||cycles().at(-1);const previousMode=state.fields['cal_'+last+'_mode'];document.querySelector('#rewardContent').innerHTML=`<button id="closeReward" class="modal-close" aria-label="Закрыть"><svg class="icon ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button><span class="tiny">${repeat?'ЕЩЁ 30 ДНЕЙ':'НОВЫЙ СТАРТ'}</span><h2>${repeat?'Повторяем второй месяц':'Настроим календарь'}</h2><p>Предыдущие циклы сохранятся. Новый цикл начнётся с выбранной даты.</p><label class="field">Дата начала<input id="cycleStart" type="date" value="${dayKey()}"></label><label class="field">Режим<select id="cycleMode"><option value="main">Только обычный</option><option value="trial">Только пробный</option><option value="both">Обычный + пробный</option></select></label><button class="primary" id="createCycle" data-repeat="${repeat?'1':'0'}">Создать ${repeat?'30':'60'} дней</button>`;openDialog('reward');document.querySelector('#cycleMode').value=repeat&&['main','trial','both'].includes(previousMode)?previousMode:selectedMode();}
 function downloadJSON(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({app:'kadr',version:2,state},null,2)],{type:'application/json'}));a.download='kadr-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 let pendingImport=null;
 document.addEventListener('change',async e=>{if(e.target.id!=='restore')return;const file=e.target.files[0];if(!file)return;try{if(file.size>5e6)throw Error();const raw=JSON.parse(await file.text());if(raw.app!=='kadr'||raw.version!==2||!raw.state||!raw.state.fields||typeof raw.state.fields!=='object'||Array.isArray(raw.state.fields)||!Array.isArray(raw.state.done))throw Error();pendingImport=KadrState.normalize(raw.state);pendingImport.epoch=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);document.querySelector('#rewardContent').innerHTML=`<button id="closeReward" class="modal-close" aria-label="Закрыть"><svg class="icon ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button><h2>Восстановить копию?</h2><p>В файле ${pendingImport.done.length} пройденных миссий. Ответы и календарь из файла заменят текущий прогресс. При включённой синхронизации замена сохранится и в аккаунте. Сначала можно сохранить текущую копию.</p><button class="secondary" id="backup">Скачать текущую копию</button><button class="primary" id="confirmImport">Заменить данные</button>`;openDialog('reward')}catch{toast('Не удалось прочитать копию Кадра. Выбери JSON, скачанный из рюкзака.')}});
 document.addEventListener('input',e=>{if(['refFollowers','refViews','refAge'].includes(e.target.dataset.field))updateRef()});
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.equip!==undefined){const c=Number(b.dataset.equip);if(equipPin(c)){navRender();achievements();document.querySelector('.album-count')?.focus?.({preventScroll:true});toast('Значок «'+stickerNames[c]+'» теперь в профиле.')}return}
  if(b.dataset.chapter!==undefined){document.querySelector('#reward').close();render('chapter/'+(Number(b.dataset.chapter)+1))}
  if(b.dataset.rewardGo!==undefined){document.querySelector('#reward').close();render(/^\d+$/.test(b.dataset.rewardGo)?Number(b.dataset.rewardGo):b.dataset.rewardGo)}
  if(b.hasAttribute('data-copy-editor'))copy(editorPrompt);
