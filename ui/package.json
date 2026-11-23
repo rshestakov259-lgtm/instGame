@@ -1,0 +1,20 @@
+{
+  "name": "kadr-game-controls",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/unbounded": "5.3.0",
+    "@mantine/core": "9.8.2",
+    "@mantine/hooks": "9.8.2",
+    "@phosphor-icons/react": "2.1.10",
+    "@radix-ui/react-progress": "1.2.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

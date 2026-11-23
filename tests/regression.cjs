@@ -112,7 +112,7 @@ test('chapter covers resume the current unfinished mission and advance after a c
   const page=()=>a.ctx.document.querySelector('#app').innerHTML;
   assert.match(page(),/class="studio-primary" data-lesson="22"/);
   assert.match(page(),/Продолжить миссию/);
-  assert.equal((page().match(/class="track-card"/g)||[]).length,6);
+  assert.equal((page().match(/class="stage-key"/g)||[]).length,6);
   a.run('state.done=chapterIds(3);render("chapter/4","none")');
   assert.match(page(),/class="studio-primary" data-view="chapter\/5"/);
   a.run('state.done=Array.from({length:42},(_,i)=>i);render("chapter/4","none")');
@@ -125,7 +125,8 @@ test('both route displays identify the selected mission, and completed states ha
     const html=a.run('missionMap(1,10,'+compact+')');
     assert.match(html,/is-finished[\s\S]*?data-lesson="6"[\s\S]*?Пройдена/);
     assert.match(html,/is-next-up[\s\S]*?data-lesson="10"[\s\S]*?Следующая/);
-    assert.equal(html.includes('track-detail'),!compact);
+    assert.equal(html.includes('stage-wire'),!compact);
+    assert.equal(html.includes('compact-track'),compact);
     assert.equal((html.match(/data-lesson=/g)||[]).length,6);
   }
   for(let i=0;i<42;i++){
@@ -133,5 +134,57 @@ test('both route displays identify the selected mission, and completed states ha
     const page=a.ctx.document.querySelector('#app').innerHTML;
     assert.equal((page.match(/aria-current="step"/g)||[]).length,1);
     assert.equal((page.match(/id="lesson-practice"/g)||[]).length,i<6?0:1);
+  }
+});
+
+test('seven playable boards keep six distinct stops, a current marker and accessible mission titles',()=>{
+  const a=app();
+  for(let c=0;c<7;c++){
+    const html=a.run(`missionMap(${c},${c*6+2},false)`);
+    assert.deepEqual([...html.matchAll(/data-lesson="(\d+)"/g)].map(m=>Number(m[1])),Array.from({length:6},(_,j)=>c*6+j));
+    assert.equal((html.match(/aria-current="step"/g)||[]).length,1);
+    assert.equal((html.match(/aria-label="Миссия /g)||[]).length,6);
+    assert.equal((html.match(/class="wire-core"/g)||[]).length,10);
+  }
+});
+test('only a completed chapter can supply a profile pin, and it survives reload and backup',()=>{
+  const a=app({done:[0,1,2,3,4],fields:{profilePin:'camera'}});
+  assert.equal(a.run('equippedChapter()'),-1);
+  assert.equal(a.run('equipPin(0)'),false);
+  a.run('state.done.push(5);persist()');
+  for(const n of [1,-1,7,1.3]) assert.equal(a.run(`equipPin(${n})`),false);
+  assert.equal(a.run('equipPin(0)'),true);
+  assert.equal(a.run('equipPin(0)'),true);
+  const b=app(JSON.parse(a.values.get('reels-start-v1')));
+  assert.match(b.run('profileMark()'),/camera\.webp/);
+  assert.equal(b.run('state.done.length'),6);
+  b.run('render("achievements","none")');
+  assert.equal((b.ctx.document.querySelector('#app').innerHTML.match(/data-equip=/g)||[]).length,1);
+});
+
+test('all seven chapters ship distinct mobile and desktop illustrations and an enamel pin',()=>{
+  const a=app();
+  const files=new Set();
+  for(let c=0;c<7;c++){
+    const chapter=a.run(`[sceneFile(${c}), sceneFile(${c},true), pin(${c})]`);
+    for(const asset of chapter){
+      assert.ok(!files.has(asset),asset);
+      files.add(asset);
+      const image=fs.readFileSync(require('node:path').join(__dirname,'../dist',asset));
+      assert.equal(image.toString('ascii',8,12),'WEBP',asset);
+    }
+  }
+  assert.equal(files.size,21);
+});
+
+test('calendar aligns cycle dates to weekdays and restores a completed day',()=>{
+  for(const [start,offset,repeat,length] of [['2026-11-22',6,false,60],['2026-11-23',0,true,30]]){
+    const a=app({fields:{cal_1_start:start,cal_1_repeat:repeat,cal_1_day:4,cal_1_d4_done:true}});
+    a.run('render("calendar","none")');
+    const html=a.ctx.document.querySelector('#calendarBody').innerHTML;
+    assert.equal((html.match(/class="day-spacer"/g)||[]).length,offset);
+    assert.equal((html.match(/data-day=/g)||[]).length,length);
+    assert.match(html,/data-day="4" aria-pressed="true" class="selected day-complete"/);
+    assert.match(html,/id="unmarkDay" data-key="cal_1_d4_"/);
   }
 });
